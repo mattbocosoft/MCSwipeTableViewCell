@@ -16,7 +16,12 @@ static NSTimeInterval const kMCBounceDuration2 = 0.1; // Duration of the second 
 static NSTimeInterval const kMCDurationLowLimit = 0.25; // Lowest duration when swipping the cell because we try to simulate velocity
 static NSTimeInterval const kMCDurationHightLimit = 0.1; // Highest duration when swipping the cell because we try to simulate velocity
 
+static NSTimeInterval const kHoldInterval = 0.6;
+
 @interface MCSwipeTableViewCell () <UIGestureRecognizerDelegate>
+{
+    MCSwipeTableViewCellState _previousState;
+}
 
 // Init
 - (void)initializer;
@@ -50,9 +55,8 @@ static NSTimeInterval const kMCDurationHightLimit = 0.1; // Highest duration whe
 
 - (void)moveWithDuration:(NSTimeInterval)duration andDirection:(MCSwipeTableViewCellDirection)direction;
 
-- (void)bounceToOrigin;
-
 // Delegate
+- (void)notifyDelegateOfHeldState;
 - (void)notifyDelegate;
 
 @property(nonatomic, assign) MCSwipeTableViewCellDirection direction;
@@ -176,6 +180,8 @@ secondStateIconName:(NSString *)secondIconName
     NSTimeInterval animationDuration = [self animationDurationWithVelocity:velocity];
     _direction = [self directionWithPercentage:percentage];
 
+    MCSwipeTableViewCellState cellState = [self stateWithPercentage:percentage];
+	
     if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged) {
         _isDragging = YES;
         
@@ -188,14 +194,32 @@ secondStateIconName:(NSString *)secondIconName
         _isDragging = NO;
         
         _currentImageName = [self imageNameWithPercentage:percentage];
-        _currentPercentage = percentage;
-        MCSwipeTableViewCellState cellState= [self stateWithPercentage:percentage];
 
         if (_mode == MCSwipeTableViewCellModeExit && _direction != MCSwipeTableViewCellDirectionCenter && [self validateState:cellState])
             [self moveWithDuration:animationDuration andDirection:_direction];
         else
+		{
             [self bounceToOrigin];
+			[self notifyDelegate];
+		}
     }
+	_currentPercentage = percentage;
+	
+    if(cellState != _previousState)
+    {
+		CGPoint velocity = [gesture velocityInView:self];
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(stateHeld) object:nil];
+        if(cellState != 0)
+        {
+            [self performSelector:@selector(stateHeld) withObject:nil afterDelay:kHoldInterval];
+        }
+    }
+    _previousState = cellState;
+}
+
+- (void) stateHeld
+{
+	[self notifyDelegateOfHeldState];
 }
 
 #pragma mark - UIGestureRecognizerDelegate
@@ -419,10 +443,10 @@ secondStateIconName:(NSString *)secondIconName
 
 
     slidingImageRect = CGRectMake(position.x - slidingImageSize.width / 2.0,
-            position.y - slidingImageSize.height / 2.0,
-            slidingImageSize.width,
-            slidingImageSize.height);
-
+								  position.y - slidingImageSize.height / 2.0,
+								  slidingImageSize.width,
+								  slidingImageSize.height);
+	
     slidingImageRect = CGRectIntegral(slidingImageRect);
     [_slidingImageView setFrame:slidingImageRect];
 }
@@ -458,6 +482,7 @@ secondStateIconName:(NSString *)secondIconName
                          [self.contentView setFrame:rect];
                          [_slidingImageView setAlpha:0];
                          [self slideImageWithPercentage:percentage imageName:_currentImageName isDragging:NO];
+						 [_colorIndicatorView setBackgroundColor:[UIColor clearColor]];
                      }
                      completion:^(BOOL finished) {
                          [self notifyDelegate];
@@ -488,7 +513,6 @@ secondStateIconName:(NSString *)secondIconName
                                               [self.contentView setFrame:frame];
                                           }
                                           completion:^(BOOL finished2) {
-                                              [self notifyDelegate];
                                           }];
                      }];
 }
@@ -501,6 +525,18 @@ secondStateIconName:(NSString *)secondIconName
     if (state != MCSwipeTableViewCellStateNone) {
         if (_delegate != nil && [_delegate respondsToSelector:@selector(swipeTableViewCell:didTriggerState:withMode:)]) {
             [_delegate swipeTableViewCell:self didTriggerState:state withMode:_mode];
+        }
+    }
+}
+
+- (void)notifyDelegateOfHeldState {
+	
+    MCSwipeTableViewCellState state = [self stateWithPercentage:_currentPercentage];
+	
+    if (state != MCSwipeTableViewCellStateNone) {
+		
+        if (_delegate != nil && [_delegate respondsToSelector:@selector(swipeTableViewCell:didHoldState:withMode:)]) {
+            [_delegate swipeTableViewCell:self didHoldState:state withMode:_mode];
         }
     }
 }

@@ -30,7 +30,9 @@ typedef NS_ENUM(NSUInteger, MCSwipeTableViewCellMode){
 @protocol MCSwipeTableViewCellDelegate <NSObject>
 
 @optional
+
 - (void)swipeTableViewCell:(MCSwipeTableViewCell *)cell didTriggerState:(MCSwipeTableViewCellState)state withMode:(MCSwipeTableViewCellMode)mode;
+- (void)swipeTableViewCell:(MCSwipeTableViewCell *)cell didHoldState:(MCSwipeTableViewCellState)state withMode:(MCSwipeTableViewCellMode)mode;
 
 @end
 
@@ -71,5 +73,7 @@ secondStateIconName:(NSString *)secondIconName
                    thirdColor:(UIColor *)thirdColor
                fourthIconName:(NSString *)fourthIconName
                   fourthColor:(UIColor *)fourthColor;
+
+- (void)bounceToOrigin;
 
 @end
